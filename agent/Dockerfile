@@ -11,8 +11,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code only (see .dockerignore for what's excluded).
+# Application code, ingestion script, and knowledge base content.
+# (Tests and dev files are excluded via .dockerignore.)
 COPY app ./app
+COPY scripts ./scripts
+COPY knowledge_base ./knowledge_base
 
 # Run as a non-root user (OWASP: least privilege).
 RUN useradd --create-home --uid 1000 appuser

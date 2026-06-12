@@ -1,0 +1,10 @@
+{
+  "clients": [
+    {"name": "Acme Corporation Ltd", "status": "active", "tier": "strategic"},
+    {"name": "Globex International", "status": "active", "tier": "standard"},
+    {"name": "Initech LLC", "status": "active", "tier": "standard"},
+    {"name": "Soylent Industries", "status": "active", "tier": "strategic"},
+    {"name": "Umbrella Holdings", "status": "active", "tier": "standard"},
+    {"name": "Stark Industries", "status": "active", "tier": "strategic"}
+  ]
+}

@@ -1,0 +1,44 @@
+# Contract playbook: the rules the agent checks extracted terms against.
+# Each statement is embedded and retrieved at validation time, so it is written
+# as a clear, self-contained natural-language rule.
+
+- id: liability-cap
+  category: liability
+  statement: >
+    The limitation of liability must be capped. Unlimited or uncapped liability
+    is not acceptable. The cap should be at least equal to twelve months of fees
+    paid under the contract.
+
+- id: auto-renewal-notice
+  category: renewal
+  statement: >
+    Automatic renewal is acceptable only if the notice period required to
+    cancel renewal is sixty days or fewer. Auto-renewal with a notice period
+    longer than sixty days must be flagged for review.
+
+- id: governing-law
+  category: governing_law
+  statement: >
+    Governing law must be one of the approved jurisdictions: England and Wales,
+    the Republic of Ireland, or the State of Delaware in the USA. Any other
+    jurisdiction must be flagged for legal review.
+
+- id: payment-terms
+  category: payment
+  statement: >
+    Payment terms must fall between Net-30 and Net-60. Terms shorter than
+    Net-30 or longer than Net-60 should be flagged.
+
+- id: termination-notice
+  category: termination
+  statement: >
+    Either party must be able to terminate for convenience with at least thirty
+    days written notice. A termination notice period over ninety days must be
+    flagged as unusually long.
+
+- id: confidentiality-duration
+  category: confidentiality
+  statement: >
+    Confidentiality obligations should survive for between three and five years
+    after termination. Durations outside this range, or perpetual
+    confidentiality, must be flagged.
