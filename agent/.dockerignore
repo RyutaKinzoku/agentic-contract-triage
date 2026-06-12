@@ -1,0 +1,12 @@
+# Keep the image small and free of secrets / dev cruft.
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+requirements-dev.txt
+.env
+.env.*
