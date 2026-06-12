@@ -1,0 +1,4 @@
+# Runtime dependencies for the agent service.
+# Pinned to minor versions for reproducible builds; bump deliberately.
+pydantic>=2.7,<3.0
+pydantic-settings>=2.2,<3.0
