@@ -1,0 +1,9 @@
+# Tooling configuration for the agent package.
+#
+# Runtime/dev dependencies live in requirements*.txt (used by the Docker build).
+# This file configures the test runner so `pytest` resolves the `app` package
+# no matter how it is invoked, removing the need to set PYTHONPATH by hand.
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

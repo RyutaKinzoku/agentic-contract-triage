@@ -1,0 +1,156 @@
+"""Contract extraction from document attachments.
+
+Defines the :class:`Extractor` interface and a Gemini-backed implementation.
+Keeping extraction behind an interface lets the API layer depend on the
+abstraction (dependency inversion) and lets tests substitute a stub instead of
+calling the live model.
+
+The Gemini implementation is multimodal: it sends the raw attachment bytes
+(PDF, image, or CSV) directly to the model, so scanned and photographed
+contracts are handled without a separate OCR step. The model is asked to return
+JSON, which is then validated against :class:`~app.schemas.ContractExtraction`
+with Pydantic, so malformed output is rejected rather than trusted.
+
+Design note: the target schema uses a generic wrapper (``ExtractedField[T]``)
+whose JSON Schema contains ``$ref``/``$defs``. Rather than rely on server-side
+structured-output conversion handling that cleanly, we run the model in JSON
+mode with the schema embedded in the prompt and validate locally. This is robust
+to schema complexity and keeps validation firmly in our control.
+"""
+
+import asyncio
+import json
+import logging
+from typing import Any, Protocol, runtime_checkable
+
+from google import genai
+from google.genai import types
+from pydantic import ValidationError
+
+from app.schemas import ContractExtraction
+
+logger = logging.getLogger(__name__)
+
+# Computed once: the exact schema the model must conform to.
+_SCHEMA_JSON = json.dumps(ContractExtraction.model_json_schema())
+
+_PROMPT = (
+    "You are a contract analyst extracting structured data from a single "
+    "contract document. Return a JSON object that conforms exactly to this "
+    "JSON Schema:\n\n"
+    f"{_SCHEMA_JSON}\n\n"
+    "For every field set:\n"
+    "- `value`: the extracted value, or null if it is genuinely absent.\n"
+    "- `confidence`: a number from 0.0 to 1.0 reflecting how certain you are.\n"
+    "- `source_snippet`: a short verbatim quote supporting the value, or null.\n\n"
+    "Do not invent or infer values that the text does not support; when unsure, "
+    "lower the confidence rather than guessing. Dates must be ISO 8601 "
+    "(YYYY-MM-DD). Return only the JSON object, with no surrounding prose."
+)
+
+
+class ExtractionError(Exception):
+    """Raised when extraction fails: a model error or unparseable output."""
+
+
+@runtime_checkable
+class Extractor(Protocol):
+    """Interface for turning a document into a :class:`ContractExtraction`."""
+
+    async def extract(self, content: bytes, mime_type: str) -> ContractExtraction:
+        """Extract structured contract data from raw document bytes.
+
+        Args:
+            content: The raw bytes of the attachment.
+            mime_type: The attachment's MIME type, e.g. 'application/pdf'.
+
+        Returns:
+            A populated :class:`ContractExtraction`.
+
+        Raises:
+            ExtractionError: If extraction or validation fails.
+        """
+        ...
+
+
+class GeminiExtractor:
+    """Extractor backed by the Gemini multimodal API.
+
+    Args:
+        api_key: Gemini API key.
+        model: Gemini model identifier (e.g. 'gemini-2.5-flash').
+    """
+
+    def __init__(self, api_key: str, model: str) -> None:
+        self._client = genai.Client(api_key=api_key)
+        self._model = model
+
+    async def extract(self, content: bytes, mime_type: str) -> ContractExtraction:
+        """Extract contract data, running the blocking SDK call off the loop.
+
+        Args:
+            content: Raw attachment bytes.
+            mime_type: Attachment MIME type.
+
+        Returns:
+            A validated :class:`ContractExtraction`.
+
+        Raises:
+            ExtractionError: On any model error or invalid output.
+        """
+        return await asyncio.to_thread(self._extract_sync, content, mime_type)
+
+    def _extract_sync(self, content: bytes, mime_type: str) -> ContractExtraction:
+        """Perform the synchronous Gemini call and validate the result.
+
+        Args:
+            content: Raw attachment bytes.
+            mime_type: Attachment MIME type.
+
+        Returns:
+            A validated :class:`ContractExtraction`.
+
+        Raises:
+            ExtractionError: On any model error or invalid/unparseable output.
+        """
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=[
+                    types.Part.from_bytes(data=content, mime_type=mime_type),
+                    _PROMPT,
+                ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.0,
+                ),
+            )
+        # The SDK surfaces a range of provider/network errors; map them all to a
+        # single domain error at this boundary so callers don't depend on SDK
+        # internals.
+        except Exception as exc:
+            logger.exception("Gemini request failed")
+            raise ExtractionError("model request failed") from exc
+
+        return self._parse_response(response)
+
+    @staticmethod
+    def _parse_response(response: Any) -> ContractExtraction:
+        """Validate a Gemini response into the domain model.
+
+        Args:
+            response: The object returned by ``generate_content``.
+
+        Returns:
+            A validated :class:`ContractExtraction`.
+
+        Raises:
+            ExtractionError: If the response is empty or fails validation.
+        """
+        text = getattr(response, "text", None)
+        if not text:
+            raise ExtractionError("model returned an empty response")
+        try:
+            return ContractExtraction.model_validate_json(text)
+        except ValidationError as exc:
+            raise ExtractionError("model output did not match the schema") from exc
