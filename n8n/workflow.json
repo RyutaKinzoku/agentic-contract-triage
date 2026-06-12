@@ -1,0 +1,252 @@
+{
+  "name": "Contract Intake & Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Contract Intake & Triage\nGmail attachment -> agent /triage -> branch on outcome -> Google Sheets + notify.\n\nThe agent is reached at http://agent:8000 over the Docker network.\nConfigure Gmail and Google Sheets credentials in the UI; they are never part of this export.",
+        "height": 200,
+        "width": 380
+      },
+      "id": "note-overview",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-40, -40]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "simple": false,
+        "filters": { "readStatus": "unread" },
+        "options": { "downloadAttachments": true }
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [180, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent:8000/triage",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "attachment_0"
+            }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "http-triage",
+      "name": "Call Agent /triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 220]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.outcome }}",
+                    "rightValue": "auto_approve",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "auto_approve"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.outcome }}",
+                    "rightValue": "needs_review",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "needs_review"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.outcome }}",
+                    "rightValue": "quarantine",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "quarantine"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-outcome",
+      "name": "Switch on Outcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [660, 220]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "Timestamp", "value": "={{ $now.toISO() }}", "type": "string" },
+            { "id": "a2", "name": "Counterparty", "value": "={{ $json.extraction.counterparty.name.value }}", "type": "string" },
+            { "id": "a3", "name": "Contract Type", "value": "={{ $json.extraction.contract_type.value }}", "type": "string" },
+            { "id": "a4", "name": "Effective Date", "value": "={{ $json.extraction.effective_date.value }}", "type": "string" },
+            { "id": "a5", "name": "Governing Law", "value": "={{ $json.extraction.governing_law.value }}", "type": "string" },
+            { "id": "a6", "name": "Liability Cap", "value": "={{ $json.extraction.liability_cap.value }}", "type": "string" },
+            { "id": "a7", "name": "Outcome", "value": "={{ $json.outcome }}", "type": "string" },
+            { "id": "a8", "name": "Email Subject", "value": "={{ $('Gmail Trigger').item.json.subject }}", "type": "string" },
+            { "id": "a9", "name": "From", "value": "={{ $('Gmail Trigger').item.json.from }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-approved",
+      "name": "Approved Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 60]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "b1", "name": "Timestamp", "value": "={{ $now.toISO() }}", "type": "string" },
+            { "id": "b2", "name": "Counterparty", "value": "={{ $json.extraction.counterparty.name.value }}", "type": "string" },
+            { "id": "b3", "name": "Contract Type", "value": "={{ $json.extraction.contract_type.value }}", "type": "string" },
+            { "id": "b4", "name": "Outcome", "value": "={{ $json.outcome }}", "type": "string" },
+            { "id": "b5", "name": "Reasons", "value": "={{ $json.reasons.join('; ') }}", "type": "string" },
+            { "id": "b6", "name": "Email Subject", "value": "={{ $('Gmail Trigger').item.json.subject }}", "type": "string" },
+            { "id": "b7", "name": "From", "value": "={{ $('Gmail Trigger').item.json.from }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-review",
+      "name": "Review Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 240]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "c1", "name": "Timestamp", "value": "={{ $now.toISO() }}", "type": "string" },
+            { "id": "c2", "name": "Counterparty", "value": "", "type": "string" },
+            { "id": "c3", "name": "Contract Type", "value": "", "type": "string" },
+            { "id": "c4", "name": "Outcome", "value": "quarantine", "type": "string" },
+            { "id": "c5", "name": "Reasons", "value": "={{ $json.reasons.join('; ') }}", "type": "string" },
+            { "id": "c6", "name": "Email Subject", "value": "={{ $('Gmail Trigger').item.json.subject }}", "type": "string" },
+            { "id": "c7", "name": "From", "value": "={{ $('Gmail Trigger').item.json.from }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-quarantine",
+      "name": "Quarantine Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Approved", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "sheets-approved",
+      "name": "Append: Approved",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1160, 60]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Needs Review", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "sheets-review",
+      "name": "Append: Needs Review",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1160, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "reviewer@example.com",
+        "subject": "=Contract needs review: {{ $('Gmail Trigger').item.json.subject }}",
+        "emailType": "text",
+        "message": "=A contract was flagged for review.\n\nCounterparty: {{ $json.Counterparty }}\nReasons: {{ $json.Reasons }}\n\nSee the Needs Review sheet for details.",
+        "options": {}
+      },
+      "id": "gmail-notify",
+      "name": "Notify Reviewer",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1420, 300]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [[{ "node": "Call Agent /triage", "type": "main", "index": 0 }]]
+    },
+    "Call Agent /triage": {
+      "main": [[{ "node": "Switch on Outcome", "type": "main", "index": 0 }]]
+    },
+    "Switch on Outcome": {
+      "main": [
+        [{ "node": "Approved Row", "type": "main", "index": 0 }],
+        [{ "node": "Review Row", "type": "main", "index": 0 }],
+        [{ "node": "Quarantine Row", "type": "main", "index": 0 }]
+      ]
+    },
+    "Approved Row": {
+      "main": [[{ "node": "Append: Approved", "type": "main", "index": 0 }]]
+    },
+    "Review Row": {
+      "main": [[{ "node": "Append: Needs Review", "type": "main", "index": 0 }]]
+    },
+    "Quarantine Row": {
+      "main": [[{ "node": "Append: Needs Review", "type": "main", "index": 0 }]]
+    },
+    "Append: Needs Review": {
+      "main": [[{ "node": "Notify Reviewer", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateId": "contract-intake-triage" }
+}
