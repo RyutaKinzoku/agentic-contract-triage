@@ -186,3 +186,20 @@ def test_signatories_objects_are_flattened() -> None:
     }
     contract = ContractExtraction.model_validate(payload)
     assert contract.signatories.value == ["Jane Doe, Director"]
+
+
+def test_null_field_becomes_empty_field() -> None:
+    """A field returned as null (not an object) is treated as empty.
+
+    Inputs: end_date and payment_terms returned as null.
+    Expected: validation succeeds with default empty fields, not an error.
+    """
+    payload = {
+        "counterparty": {"name": {"value": "Acme", "confidence": 0.9}},
+        "end_date": None,
+        "payment_terms": None,
+    }
+    contract = ContractExtraction.model_validate(payload)
+    assert contract.end_date.value is None
+    assert contract.payment_terms.net_days.value is None
+    assert contract.counterparty.name.value == "Acme"

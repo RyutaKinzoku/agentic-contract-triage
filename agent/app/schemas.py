@@ -19,7 +19,7 @@ import re
 from enum import Enum
 from typing import Annotated, Generic, Optional, TypeVar
 
-from pydantic import BaseModel, BeforeValidator, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator
 
 T = TypeVar("T")
 
@@ -206,7 +206,33 @@ class RenewalType(str, Enum):
         return cls.NONE
 
 
-class Counterparty(BaseModel):
+class _ExtractionModel(BaseModel):
+    """Base for extraction models that tolerates null fields.
+
+    When a field is genuinely absent, models sometimes return the whole field as
+    ``null`` (e.g. ``"end_date": null``) instead of an object with a null value.
+    This validator rewrites any null field to an empty object, so it becomes a
+    default :class:`ExtractedField` (value None, confidence 0) rather than failing
+    validation and discarding the entire extraction.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _nulls_to_empty_fields(cls, data: object) -> object:
+        """Replace any top-level null field value with an empty object.
+
+        Args:
+            data: The raw input (a dict when coming from JSON).
+
+        Returns:
+            The input with null field values replaced by empty dicts.
+        """
+        if isinstance(data, dict):
+            return {key: ({} if value is None else value) for key, value in data.items()}
+        return data
+
+
+class Counterparty(_ExtractionModel):
     """The other party to the contract."""
 
     name: ExtractedField[str] = Field(
@@ -219,7 +245,7 @@ class Counterparty(BaseModel):
     )
 
 
-class RenewalTerms(BaseModel):
+class RenewalTerms(_ExtractionModel):
     """Renewal configuration extracted from the contract."""
 
     type: ExtractedField[RenewalType] = Field(
@@ -232,7 +258,7 @@ class RenewalTerms(BaseModel):
     )
 
 
-class PaymentTerms(BaseModel):
+class PaymentTerms(_ExtractionModel):
     """Payment configuration extracted from the contract."""
 
     amount: ExtractedField[LenientFloat] = Field(
@@ -253,7 +279,7 @@ class PaymentTerms(BaseModel):
     )
 
 
-class ContractExtraction(BaseModel):
+class ContractExtraction(_ExtractionModel):
     """Structured representation of a single contract.
 
     This is the top-level object returned by the extraction step and consumed by
