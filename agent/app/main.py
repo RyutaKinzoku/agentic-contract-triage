@@ -65,6 +65,7 @@ def get_extractor(settings: Settings = Depends(get_settings)) -> Extractor:
     return GeminiExtractor(
         api_key=settings.gemini_api_key.get_secret_value(),
         model=settings.gemini_model,
+        organisation_name=settings.organisation_name,
     )
 
 

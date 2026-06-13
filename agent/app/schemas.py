@@ -15,12 +15,91 @@ schema generated from these models is passed to Gemini, so the field
 descriptions become part of the extraction instructions.
 """
 
+import re
 from enum import Enum
-from typing import Generic, Optional, TypeVar
+from typing import Annotated, Generic, Optional, TypeVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, field_validator
 
 T = TypeVar("T")
+
+
+def _coerce_int(value: object) -> Optional[int]:
+    """Pull an integer out of messy model output.
+
+    Models sometimes return numbers as words or with units, e.g. "ninety (90)
+    days" or "Net-30". This extracts the first run of digits; unparseable input
+    becomes None rather than failing validation.
+
+    Args:
+        value: The raw value from the model.
+
+    Returns:
+        The parsed integer, or None.
+    """
+    if value is None or isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        match = re.search(r"\d+", value.replace(",", ""))
+        return int(match.group()) if match else None
+    return value
+
+
+def _coerce_float(value: object) -> Optional[float]:
+    """Pull a number out of messy model output (e.g. 'GBP 12,000').
+
+    Args:
+        value: The raw value from the model.
+
+    Returns:
+        The parsed float, or None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        match = re.search(r"\d+(?:\.\d+)?", value.replace(",", ""))
+        return float(match.group()) if match else None
+    return value
+
+
+def _coerce_str_list(value: object) -> Optional[list[str]]:
+    """Normalise a list of names that the model may return as objects.
+
+    Signatories are sometimes returned as dicts ({"name": ..., "title": ...})
+    or as a single string. This flattens everything to a list of strings.
+
+    Args:
+        value: The raw value from the model.
+
+    Returns:
+        A list of strings, or None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, dict):
+                result.append(", ".join(str(v) for v in item.values() if v))
+            else:
+                result.append(str(item))
+        return result
+    return value
+
+
+# Lenient field types: tolerate the formats models actually emit, so a stray
+# "Net-30" or a signatory object never fails the whole extraction.
+LenientInt = Annotated[Optional[int], BeforeValidator(_coerce_int)]
+LenientFloat = Annotated[Optional[float], BeforeValidator(_coerce_float)]
+LenientStrList = Annotated[Optional[list[str]], BeforeValidator(_coerce_str_list)]
 
 
 class ExtractedField(BaseModel, Generic[T]):
@@ -147,7 +226,7 @@ class RenewalTerms(BaseModel):
         default_factory=ExtractedField,
         description="Whether renewal is automatic, manual, or none.",
     )
-    notice_period_days: ExtractedField[int] = Field(
+    notice_period_days: ExtractedField[LenientInt] = Field(
         default_factory=ExtractedField,
         description="Days of notice required to prevent or trigger renewal.",
     )
@@ -156,7 +235,7 @@ class RenewalTerms(BaseModel):
 class PaymentTerms(BaseModel):
     """Payment configuration extracted from the contract."""
 
-    amount: ExtractedField[float] = Field(
+    amount: ExtractedField[LenientFloat] = Field(
         default_factory=ExtractedField,
         description="Contract value or fee amount.",
     )
@@ -168,7 +247,7 @@ class PaymentTerms(BaseModel):
         default_factory=ExtractedField,
         description="Payment schedule, e.g. monthly, on milestones.",
     )
-    net_days: ExtractedField[int] = Field(
+    net_days: ExtractedField[LenientInt] = Field(
         default_factory=ExtractedField,
         description="Payment due window in days, e.g. 30 for Net-30.",
     )
@@ -219,7 +298,7 @@ class ContractExtraction(BaseModel):
         default_factory=ExtractedField,
         description="Governing law / jurisdiction, e.g. 'England and Wales'.",
     )
-    termination_notice_days: ExtractedField[int] = Field(
+    termination_notice_days: ExtractedField[LenientInt] = Field(
         default_factory=ExtractedField,
         description="Notice required to terminate, in days.",
     )
@@ -227,7 +306,7 @@ class ContractExtraction(BaseModel):
         default_factory=ExtractedField,
         description="How long confidentiality obligations last.",
     )
-    signatories: ExtractedField[list[str]] = Field(
+    signatories: ExtractedField[LenientStrList] = Field(
         default_factory=ExtractedField,
         description="Names of people who signed the contract.",
     )

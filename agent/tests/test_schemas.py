@@ -153,3 +153,36 @@ def test_non_iso_date_is_accepted() -> None:
     payload = {"effective_date": {"value": "15 January 2026", "confidence": 0.8}}
     contract = ContractExtraction.model_validate(payload)
     assert contract.effective_date.value == "15 January 2026"
+
+
+def test_textual_numbers_are_coerced() -> None:
+    """Numbers embedded in text are parsed to ints.
+
+    Inputs: net_days 'Net-30' and renewal notice 'ninety (90) days'.
+    Expected: they become 30 and 90.
+    """
+    payload = {
+        "payment_terms": {"net_days": {"value": "Net-30", "confidence": 0.7}},
+        "renewal": {
+            "notice_period_days": {"value": "ninety (90) days", "confidence": 0.7}
+        },
+    }
+    contract = ContractExtraction.model_validate(payload)
+    assert contract.payment_terms.net_days.value == 30
+    assert contract.renewal.notice_period_days.value == 90
+
+
+def test_signatories_objects_are_flattened() -> None:
+    """Signatories returned as objects are flattened to strings.
+
+    Inputs: signatories as a list of {name, title} dicts.
+    Expected: each becomes a single string.
+    """
+    payload = {
+        "signatories": {
+            "value": [{"name": "Jane Doe", "title": "Director"}],
+            "confidence": 0.6,
+        }
+    }
+    contract = ContractExtraction.model_validate(payload)
+    assert contract.signatories.value == ["Jane Doe, Director"]

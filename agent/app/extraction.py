@@ -34,19 +34,39 @@ logger = logging.getLogger(__name__)
 # Computed once: the exact schema the model must conform to.
 _SCHEMA_JSON = json.dumps(ContractExtraction.model_json_schema())
 
-_PROMPT = (
-    "You are a contract analyst extracting structured data from a single "
-    "contract document. Return a JSON object that conforms exactly to this "
-    "JSON Schema:\n\n"
-    f"{_SCHEMA_JSON}\n\n"
-    "For every field set:\n"
-    "- `value`: the extracted value, or null if it is genuinely absent.\n"
-    "- `confidence`: a number from 0.0 to 1.0 reflecting how certain you are.\n"
-    "- `source_snippet`: a short verbatim quote supporting the value, or null.\n\n"
-    "Do not invent or infer values that the text does not support; when unsure, "
-    "lower the confidence rather than guessing. Dates must be ISO 8601 "
-    "(YYYY-MM-DD). Return only the JSON object, with no surrounding prose."
-)
+
+def _build_prompt(organisation_name: str) -> str:
+    """Build the extraction prompt for a given organisation identity.
+
+    The organisation name is woven in so the model knows which party is the
+    counterparty: a contract names two parties, and "counterparty" only has
+    meaning relative to whoever is running the agent.
+
+    Args:
+        organisation_name: The name of the organisation operating the agent.
+
+    Returns:
+        The full extraction prompt.
+    """
+    return (
+        "You are a contract analyst extracting structured data from a single "
+        f"contract document on behalf of {organisation_name}.\n\n"
+        f"IMPORTANT: the 'counterparty' is the OTHER party to the contract — the "
+        f"client, customer, vendor, or partner that {organisation_name} is "
+        f"contracting with. It is never {organisation_name} itself, and never a "
+        "generic role label such as 'the Provider' or 'the Company'. Extract the "
+        "named external organisation as the counterparty.\n\n"
+        "Return a JSON object that conforms exactly to this JSON Schema:\n\n"
+        f"{_SCHEMA_JSON}\n\n"
+        "For every field set:\n"
+        "- `value`: the extracted value, or null if it is genuinely absent.\n"
+        "- `confidence`: a number from 0.0 to 1.0 reflecting how certain you are.\n"
+        "- `source_snippet`: a short verbatim quote supporting the value, or null.\n\n"
+        "Do not invent or infer values that the text does not support; when unsure, "
+        "lower the confidence rather than guessing. Dates should use ISO 8601 "
+        "(YYYY-MM-DD) where possible. Return only the JSON object, with no "
+        "surrounding prose."
+    )
 
 
 class ExtractionError(Exception):
@@ -79,11 +99,19 @@ class GeminiExtractor:
     Args:
         api_key: Gemini API key.
         model: Gemini model identifier (e.g. 'gemini-2.5-flash').
+        organisation_name: Name of the organisation running the agent, used to
+            identify the counterparty during extraction.
     """
 
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        organisation_name: str = "our organisation",
+    ) -> None:
         self._client = genai.Client(api_key=api_key)
         self._model = model
+        self._prompt = _build_prompt(organisation_name)
 
     async def extract(self, content: bytes, mime_type: str) -> ContractExtraction:
         """Extract contract data, running the blocking SDK call off the loop.
@@ -118,7 +146,7 @@ class GeminiExtractor:
                 model=self._model,
                 contents=[
                     types.Part.from_bytes(data=content, mime_type=mime_type),
-                    _PROMPT,
+                    self._prompt,
                 ],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -171,4 +199,10 @@ class GeminiExtractor:
         try:
             return ContractExtraction.model_validate_json(text)
         except ValidationError as exc:
+            problems = "; ".join(
+                f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']} "
+                f"(got {err.get('input')!r})"
+                for err in exc.errors()
+            )
+            logger.warning("Extraction failed schema validation: %s", problems)
             raise ExtractionError("model output did not match the schema") from exc

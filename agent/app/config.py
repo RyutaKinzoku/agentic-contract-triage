@@ -42,6 +42,14 @@ class Settings(BaseSettings):
         description="Gemini model used for extraction.",
     )
 
+    organisation_name: str = Field(
+        default="Northwind Technology Ltd",
+        description=(
+            "Name of the organisation running this agent. Used during extraction "
+            "to identify the counterparty (the other party to the contract)."
+        ),
+    )
+
     qdrant_url: str = Field(
         default="http://qdrant:6333",
         description="Qdrant base URL.",
