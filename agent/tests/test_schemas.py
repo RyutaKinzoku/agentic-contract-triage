@@ -1,24 +1,11 @@
 """Tests for the contract extraction schema."""
 
-import pytest
-from pydantic import ValidationError
-
 from app.schemas import (
     ContractExtraction,
     ContractType,
     ExtractedField,
     RenewalType,
 )
-
-
-def test_confidence_must_be_within_range() -> None:
-    """A confidence above 1.0 is rejected by validation.
-
-    Inputs: an ExtractedField with confidence 1.5.
-    Expected: pydantic raises ValidationError.
-    """
-    with pytest.raises(ValidationError):
-        ExtractedField[str](value="x", confidence=1.5)
 
 
 def test_field_defaults_to_empty() -> None:
@@ -119,5 +106,50 @@ def test_parses_representative_contract() -> None:
     assert contract.counterparty.name.value == "Acme Corporation Ltd"
     assert contract.contract_type.value is ContractType.NDA
     assert contract.renewal.type.value is RenewalType.AUTO
-    assert contract.effective_date.value is not None
-    assert contract.effective_date.value.year == 2026
+    assert contract.effective_date.value == "2026-01-15"
+
+
+def test_confidence_percentage_is_normalised() -> None:
+    """A confidence given as a percentage (95) is normalised to 0.95.
+
+    Inputs: an ExtractedField with confidence 95.
+    Expected: confidence is coerced to 0.95 rather than rejected.
+    """
+    field: ExtractedField[str] = ExtractedField(value="x", confidence=95)
+    assert field.confidence == 0.95
+
+
+def test_confidence_above_range_is_clamped() -> None:
+    """A confidence slightly above 1.0 is clamped, not rejected.
+
+    Inputs: an ExtractedField with confidence 1.4.
+    Expected: confidence is clamped to 1.0.
+    """
+    field: ExtractedField[str] = ExtractedField(value="x", confidence=1.4)
+    assert field.confidence == 1.0
+
+
+def test_enum_tolerates_case_variants() -> None:
+    """Uppercase or spaced enum labels resolve instead of failing.
+
+    Inputs: contract_type 'NDA' and renewal type 'Auto'.
+    Expected: they resolve to the correct enum members.
+    """
+    payload = {
+        "contract_type": {"value": "NDA", "confidence": 0.9},
+        "renewal": {"type": {"value": "Auto", "confidence": 0.9}},
+    }
+    contract = ContractExtraction.model_validate(payload)
+    assert contract.contract_type.value is ContractType.NDA
+    assert contract.renewal.type.value is RenewalType.AUTO
+
+
+def test_non_iso_date_is_accepted() -> None:
+    """A natural-language date is stored as-is rather than rejected.
+
+    Inputs: effective_date '15 January 2026'.
+    Expected: the value is kept verbatim.
+    """
+    payload = {"effective_date": {"value": "15 January 2026", "confidence": 0.8}}
+    contract = ContractExtraction.model_validate(payload)
+    assert contract.effective_date.value == "15 January 2026"

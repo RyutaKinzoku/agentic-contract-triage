@@ -15,11 +15,10 @@ schema generated from these models is passed to Gemini, so the field
 descriptions become part of the extraction instructions.
 """
 
-from datetime import date
 from enum import Enum
 from typing import Generic, Optional, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T")
 
@@ -51,6 +50,33 @@ class ExtractedField(BaseModel, Generic[T]):
         description="Verbatim text from the document supporting the value.",
     )
 
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _normalise_confidence(cls, value: object) -> float:
+        """Coerce a model-supplied confidence into the 0.0-1.0 range.
+
+        Models occasionally return confidence as a percentage (e.g. 95) or
+        slightly out of range. Rather than reject the whole extraction, we
+        normalise: clear percentages are divided by 100 and everything is
+        clamped to [0, 1].
+
+        Args:
+            value: The raw confidence from the model.
+
+        Returns:
+            A confidence in the range 0.0 to 1.0.
+        """
+        if value is None:
+            return 0.0
+        try:
+            number = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return 0.0
+        if number > 1.0:
+            # Treat clearly-percentage values (>= 2) as fractions; clamp the rest.
+            number = number / 100.0 if number >= 2.0 else 1.0
+        return max(0.0, min(1.0, number))
+
 
 class ContractType(str, Enum):
     """Recognised contract categories."""
@@ -61,6 +87,20 @@ class ContractType(str, Enum):
     SERVICE_AGREEMENT = "service_agreement"
     OTHER = "other"
 
+    @classmethod
+    def _missing_(cls, value: object) -> "ContractType":
+        """Resolve case/format variants (e.g. 'NDA', 'Service Agreement').
+
+        Falls back to OTHER for anything unrecognised rather than raising, so a
+        stray label never fails the whole extraction.
+        """
+        if isinstance(value, str):
+            normalised = value.strip().lower().replace("-", "_").replace(" ", "_")
+            for member in cls:
+                if member.value == normalised:
+                    return member
+        return cls.OTHER
+
 
 class RenewalType(str, Enum):
     """How a contract renews at the end of its term."""
@@ -68,6 +108,23 @@ class RenewalType(str, Enum):
     AUTO = "auto"
     MANUAL = "manual"
     NONE = "none"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "RenewalType":
+        """Resolve case/format variants (e.g. 'Auto', 'AUTOMATIC').
+
+        Falls back to NONE for anything unrecognised.
+        """
+        if isinstance(value, str):
+            normalised = value.strip().lower()
+            if normalised.startswith("auto"):
+                return cls.AUTO
+            if normalised.startswith("man"):
+                return cls.MANUAL
+            for member in cls:
+                if member.value == normalised:
+                    return member
+        return cls.NONE
 
 
 class Counterparty(BaseModel):
@@ -134,17 +191,17 @@ class ContractExtraction(BaseModel):
         default_factory=ExtractedField,
         description="Category of the contract.",
     )
-    effective_date: ExtractedField[date] = Field(
+    effective_date: ExtractedField[str] = Field(
         default_factory=ExtractedField,
-        description="Date the contract takes effect (ISO 8601).",
+        description="Date the contract takes effect, ideally ISO 8601 (YYYY-MM-DD).",
     )
     term_length: ExtractedField[str] = Field(
         default_factory=ExtractedField,
         description="Duration of the contract term, e.g. '12 months'.",
     )
-    end_date: ExtractedField[date] = Field(
+    end_date: ExtractedField[str] = Field(
         default_factory=ExtractedField,
-        description="Date the contract expires (ISO 8601).",
+        description="Date the contract expires, ideally ISO 8601 (YYYY-MM-DD).",
     )
     renewal: RenewalTerms = Field(
         default_factory=RenewalTerms,

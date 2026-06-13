@@ -123,6 +123,14 @@ class GeminiExtractor:
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.0,
+                    # Extraction is a deterministic, structured task that does not
+                    # benefit from extended thinking. Disabling it (Flash only)
+                    # keeps the full output budget for the JSON itself, which
+                    # otherwise can be exhausted by thinking tokens on the
+                    # largest, fully-populated contracts — leaving an empty
+                    # response that would be wrongly quarantined.
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    max_output_tokens=8192,
                 ),
             )
         # The SDK surfaces a range of provider/network errors; map them all to a
@@ -149,6 +157,16 @@ class GeminiExtractor:
         """
         text = getattr(response, "text", None)
         if not text:
+            # Surface *why* nothing came back (e.g. MAX_TOKENS, SAFETY) so this
+            # is diagnosable from the logs rather than a silent quarantine.
+            finish_reason = None
+            try:
+                finish_reason = response.candidates[0].finish_reason
+            except (AttributeError, IndexError, TypeError):
+                pass
+            logger.warning(
+                "Model returned an empty response (finish_reason=%s)", finish_reason
+            )
             raise ExtractionError("model returned an empty response")
         try:
             return ContractExtraction.model_validate_json(text)
