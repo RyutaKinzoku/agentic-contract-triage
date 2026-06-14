@@ -4,29 +4,49 @@
     {
       "parameters": {
         "content": "## Contract Intake & Triage\nGmail attachment -> agent /triage -> branch on outcome -> Google Sheets + notify.\n\nThe agent is reached at http://agent:8000 over the Docker network.\nConfigure Gmail and Google Sheets credentials in the UI; they are never part of this export.",
-        "height": 200,
+        "height": 280,
         "width": 380
       },
-      "id": "note-overview",
+      "id": "b89a0e6c-1b66-4d6e-b0b0-d3bde9f3fa46",
       "name": "Overview",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-40, -40]
+      "position": [
+        16,
+        -192
+      ]
     },
     {
       "parameters": {
         "pollTimes": {
-          "item": [{ "mode": "everyMinute" }]
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
         },
         "simple": false,
-        "filters": { "readStatus": "unread" },
-        "options": { "downloadAttachments": true }
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
       },
-      "id": "gmail-trigger",
+      "id": "11bbe42c-7b13-451e-af39-c0d3e0c37a96",
       "name": "Gmail Trigger",
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.2,
-      "position": [180, 220]
+      "position": [
+        224,
+        160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D6NlujPGTCgBEIln",
+          "name": "Gmail account"
+        }
+      }
     },
     {
       "parameters": {
@@ -43,13 +63,18 @@
             }
           ]
         },
-        "options": { "timeout": 120000 }
+        "options": {
+          "timeout": 120000
+        }
       },
-      "id": "http-triage",
+      "id": "592d41a5-7163-4d9b-8d80-53672ad85d1e",
       "name": "Call Agent /triage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [420, 220]
+      "position": [
+        448,
+        256
+      ]
     },
     {
       "parameters": {
@@ -57,12 +82,20 @@
           "values": [
             {
               "conditions": {
-                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
                 "conditions": [
                   {
                     "leftValue": "={{ $json.outcome }}",
                     "rightValue": "auto_approve",
-                    "operator": { "type": "string", "operation": "equals" }
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
                   }
                 ],
                 "combinator": "and"
@@ -72,12 +105,20 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
                 "conditions": [
                   {
                     "leftValue": "={{ $json.outcome }}",
                     "rightValue": "needs_review",
-                    "operator": { "type": "string", "operation": "equals" }
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
                   }
                 ],
                 "combinator": "and"
@@ -87,12 +128,20 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
                 "conditions": [
                   {
                     "leftValue": "={{ $json.outcome }}",
                     "rightValue": "quarantine",
-                    "operator": { "type": "string", "operation": "equals" }
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
                   }
                 ],
                 "combinator": "and"
@@ -104,149 +153,613 @@
         },
         "options": {}
       },
-      "id": "switch-outcome",
+      "id": "bcab5be0-d58b-4880-aa7b-bd737ff58ecc",
       "name": "Switch on Outcome",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
-      "position": [660, 220]
+      "position": [
+        672,
+        240
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "a1", "name": "Timestamp", "value": "={{ $now.toISO() }}", "type": "string" },
-            { "id": "a2", "name": "Counterparty", "value": "={{ $json.extraction.counterparty.name.value }}", "type": "string" },
-            { "id": "a3", "name": "Contract Type", "value": "={{ $json.extraction.contract_type.value }}", "type": "string" },
-            { "id": "a4", "name": "Effective Date", "value": "={{ $json.extraction.effective_date.value }}", "type": "string" },
-            { "id": "a5", "name": "Governing Law", "value": "={{ $json.extraction.governing_law.value }}", "type": "string" },
-            { "id": "a6", "name": "Liability Cap", "value": "={{ $json.extraction.liability_cap.value }}", "type": "string" },
-            { "id": "a7", "name": "Outcome", "value": "={{ $json.outcome }}", "type": "string" },
-            { "id": "a8", "name": "Email Subject", "value": "={{ $('Gmail Trigger').item.json.subject }}", "type": "string" },
-            { "id": "a9", "name": "From", "value": "={{ $('Gmail Trigger').item.json.from }}", "type": "string" }
+            {
+              "id": "a1",
+              "name": "Timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "Counterparty",
+              "value": "={{ $json.extraction.counterparty.name.value }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "Contract Type",
+              "value": "={{ $json.extraction.contract_type.value }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "Effective Date",
+              "value": "={{ $json.extraction.effective_date.value }}",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "Governing Law",
+              "value": "={{ $json.extraction.governing_law.value }}",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "Liability Cap",
+              "value": "={{ $json.extraction.liability_cap.value }}",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "Outcome",
+              "value": "={{ $json.outcome }}",
+              "type": "string"
+            },
+            {
+              "id": "a8",
+              "name": "Email Subject",
+              "value": "={{ $('Gmail Trigger').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "a9",
+              "name": "From",
+              "value": "={{ $('Gmail Trigger').item.json.from }}",
+              "type": "string"
+            }
           ]
         },
         "options": {}
       },
-      "id": "set-approved",
+      "id": "1c40b5e9-00fb-4a68-8a5e-c3596db3ea26",
       "name": "Approved Row",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [900, 60]
+      "position": [
+        896,
+        64
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "b1", "name": "Timestamp", "value": "={{ $now.toISO() }}", "type": "string" },
-            { "id": "b2", "name": "Counterparty", "value": "={{ $json.extraction.counterparty.name.value }}", "type": "string" },
-            { "id": "b3", "name": "Contract Type", "value": "={{ $json.extraction.contract_type.value }}", "type": "string" },
-            { "id": "b4", "name": "Outcome", "value": "={{ $json.outcome }}", "type": "string" },
-            { "id": "b5", "name": "Reasons", "value": "={{ $json.reasons.join('; ') }}", "type": "string" },
-            { "id": "b6", "name": "Email Subject", "value": "={{ $('Gmail Trigger').item.json.subject }}", "type": "string" },
-            { "id": "b7", "name": "From", "value": "={{ $('Gmail Trigger').item.json.from }}", "type": "string" }
+            {
+              "id": "b1",
+              "name": "Timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "b2",
+              "name": "Counterparty",
+              "value": "={{ $json.extraction.counterparty.name.value }}",
+              "type": "string"
+            },
+            {
+              "id": "b3",
+              "name": "Contract Type",
+              "value": "={{ $json.extraction.contract_type.value }}",
+              "type": "string"
+            },
+            {
+              "id": "b4",
+              "name": "Outcome",
+              "value": "={{ $json.outcome }}",
+              "type": "string"
+            },
+            {
+              "id": "b5",
+              "name": "Reasons",
+              "value": "={{ $json.reasons.join('; ') }}",
+              "type": "string"
+            },
+            {
+              "id": "b6",
+              "name": "Email Subject",
+              "value": "={{ $('Gmail Trigger').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "b7",
+              "name": "From",
+              "value": "={{ $('Gmail Trigger').item.json.from }}",
+              "type": "string"
+            }
           ]
         },
         "options": {}
       },
-      "id": "set-review",
+      "id": "ce69aea7-41a3-4b5e-8dfb-0afbf23af2fd",
       "name": "Review Row",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [900, 240]
+      "position": [
+        896,
+        256
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "c1", "name": "Timestamp", "value": "={{ $now.toISO() }}", "type": "string" },
-            { "id": "c2", "name": "Counterparty", "value": "", "type": "string" },
-            { "id": "c3", "name": "Contract Type", "value": "", "type": "string" },
-            { "id": "c4", "name": "Outcome", "value": "quarantine", "type": "string" },
-            { "id": "c5", "name": "Reasons", "value": "={{ $json.reasons.join('; ') }}", "type": "string" },
-            { "id": "c6", "name": "Email Subject", "value": "={{ $('Gmail Trigger').item.json.subject }}", "type": "string" },
-            { "id": "c7", "name": "From", "value": "={{ $('Gmail Trigger').item.json.from }}", "type": "string" }
+            {
+              "id": "c1",
+              "name": "Timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "Counterparty",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "Contract Type",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "Outcome",
+              "value": "quarantine",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "Reasons",
+              "value": "={{ $json.reasons.join('; ') }}",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "Email Subject",
+              "value": "={{ $('Gmail Trigger').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "c7",
+              "name": "From",
+              "value": "={{ $('Gmail Trigger').item.json.from }}",
+              "type": "string"
+            }
           ]
         },
         "options": {}
       },
-      "id": "set-quarantine",
+      "id": "c8ba0f3a-1fca-4cb5-8cfe-44d68b824338",
       "name": "Quarantine Row",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [900, 420]
+      "position": [
+        896,
+        448
+      ]
     },
     {
       "parameters": {
         "operation": "append",
-        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID", "mode": "id" },
-        "sheetName": { "__rl": true, "value": "Approved", "mode": "name" },
-        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "documentId": {
+          "__rl": true,
+          "value": "1OUMgMWEb2hS4GBpZABZBz1eAWZGDWEEeIODCybdCrAw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Approved",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.Timestamp }}",
+            "Counterparty": "={{ $json.Counterparty }}",
+            "Contract Type": "={{ $json[\"Contract Type\"] }}",
+            "Effective Date": "={{ $json[\"Effective Date\"] }}",
+            "Governing Law": "={{ $json[\"Governing Law\"] }}",
+            "Liability Cap": "={{ $json[\"Liability Cap\"] }}",
+            "Outcome": "={{ $json.Outcome }}",
+            "Email Subject": "={{ $('Gmail Trigger').item.json.subject }}",
+            "From": "={{ $('Gmail Trigger').item.json.from.text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Counterparty",
+              "displayName": "Counterparty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contract Type",
+              "displayName": "Contract Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Effective Date",
+              "displayName": "Effective Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Governing Law",
+              "displayName": "Governing Law",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Liability Cap",
+              "displayName": "Liability Cap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Subject",
+              "displayName": "Email Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "From",
+              "displayName": "From",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
         "options": {}
       },
-      "id": "sheets-approved",
+      "id": "e9fe2c25-663e-4957-ba08-1270b1695106",
       "name": "Append: Approved",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1160, 60]
+      "position": [
+        1120,
+        64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "DlXopApvEkJfYxKx",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "append",
-        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID", "mode": "id" },
-        "sheetName": { "__rl": true, "value": "Needs Review", "mode": "name" },
-        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "documentId": {
+          "__rl": true,
+          "value": "1OUMgMWEb2hS4GBpZABZBz1eAWZGDWEEeIODCybdCrAw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Needs Review",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.Timestamp }}",
+            "Counterparty": "={{ $json.Counterparty }}",
+            "Contract Type": "={{ $json[\"Contract Type\"] }}",
+            "Outcome": "={{ $json.Outcome }}",
+            "Reasons": "={{ $json.Reasons }}",
+            "Email Subject": "={{ $('Gmail Trigger').item.json.subject }}",
+            "From": "={{ $('Gmail Trigger').item.json.from.text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Counterparty",
+              "displayName": "Counterparty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Contract Type",
+              "displayName": "Contract Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Reasons",
+              "displayName": "Reasons",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email Subject",
+              "displayName": "Email Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "From",
+              "displayName": "From",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
         "options": {}
       },
-      "id": "sheets-review",
+      "id": "ac8b6358-aeb1-4122-b3d6-6ee89d384d51",
       "name": "Append: Needs Review",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1160, 300]
+      "position": [
+        1120,
+        448
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "DlXopApvEkJfYxKx",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
-        "sendTo": "reviewer@example.com",
+        "sendTo": "={{ $('Gmail Trigger').item.json.from.value[0].address }}",
         "subject": "=Contract needs review: {{ $('Gmail Trigger').item.json.subject }}",
         "emailType": "text",
         "message": "=A contract was flagged for review.\n\nCounterparty: {{ $json.Counterparty }}\nReasons: {{ $json.Reasons }}\n\nSee the Needs Review sheet for details.",
         "options": {}
       },
-      "id": "gmail-notify",
+      "id": "07c0801d-d7ab-4288-9ee3-3237353ffdd1",
       "name": "Notify Reviewer",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [1420, 300]
+      "position": [
+        1344,
+        448
+      ],
+      "webhookId": "eaab471d-66d7-45c6-a6f3-57feacfe2c9e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D6NlujPGTCgBEIln",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        64
+      ],
+      "id": "e8e64d01-5cce-4219-a2e9-b813dc304443",
+      "name": "Mark a message as read",
+      "webhookId": "c06e016e-56fd-46b8-8716-369b57ea9e5d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D6NlujPGTCgBEIln",
+          "name": "Gmail account"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Gmail Trigger": {
-      "main": [[{ "node": "Call Agent /triage", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Call Agent /triage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Call Agent /triage": {
-      "main": [[{ "node": "Switch on Outcome", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Switch on Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Switch on Outcome": {
       "main": [
-        [{ "node": "Approved Row", "type": "main", "index": 0 }],
-        [{ "node": "Review Row", "type": "main", "index": 0 }],
-        [{ "node": "Quarantine Row", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Approved Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Review Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quarantine Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Approved Row": {
-      "main": [[{ "node": "Append: Approved", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Append: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Review Row": {
-      "main": [[{ "node": "Append: Needs Review", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Append: Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Quarantine Row": {
-      "main": [[{ "node": "Append: Needs Review", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Append: Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Append: Needs Review": {
-      "main": [[{ "node": "Notify Reviewer", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Notify Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark a message as read": {
+      "main": [
+        []
+      ]
     }
   },
-  "active": false,
-  "settings": { "executionOrder": "v1" },
-  "pinData": {},
-  "meta": { "templateId": "contract-intake-triage" }
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d0f9a2dc-2bc8-4964-b545-d6b8d44e4581",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "083e390460e1c36d66849442043148202bd30784e9d1ba4db5fef450b66e2b81"
+  },
+  "nodeGroups": [],
+  "id": "keGsH3lOEL01MYfq",
+  "tags": []
 }
